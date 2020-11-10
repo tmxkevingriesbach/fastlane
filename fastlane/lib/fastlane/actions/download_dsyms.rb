@@ -14,9 +14,14 @@ module Fastlane
 
         # Team selection passed though FASTLANE_ITC_TEAM_ID and FASTLANE_ITC_TEAM_NAME environment variables
         # Prompts select team if multiple teams and none specified
-        UI.message("Login to App Store Connect (#{params[:username]})")
-        Spaceship::ConnectAPI.login(params[:username], use_portal: false, use_tunes: true)
-        UI.message("Login successful")
+        if (token = self.api_token(params))
+          UI.message("Using App Store Connect API token...")
+          Spaceship::ConnectAPI.token = token
+        else
+          UI.message("Login to App Store Connect (#{params[:username]})")
+          Spaceship::ConnectAPI.login(params[:username], use_portal: false, use_tunes: true)
+          UI.message("Login successful")
+        end
 
         # Get App
         app = Spaceship::ConnectAPI::App.find(params[:app_identifier])
@@ -214,6 +219,11 @@ module Fastlane
         res.body
       end
 
+      def self.api_token(params)
+        @api_token ||= Spaceship::ConnectAPI::Token.create(params[:api_key]) if params[:api_key]
+        return @api_token
+      end
+      
       #####################################################
       # @!group Documentation
       #####################################################
@@ -244,12 +254,21 @@ module Fastlane
         user ||= CredentialsManager::AppfileConfig.try_fetch_value(:apple_id)
 
         [
+          
+          FastlaneCore::ConfigItem.new(key: :api_key,
+                                       env_name: "APPSTORE_BUILD_NUMBER_API_KEY",
+                                       description: "Your App Store Connect API Key information (https://docs.fastlane.tools/app-store-connect-api/#use-return-value-and-pass-in-as-an-option)",
+                                       type: Hash,
+                                       optional: true,
+                                       sensitive: true,
+                                       conflicting_options: [:username]),
           FastlaneCore::ConfigItem.new(key: :username,
                                        short_option: "-u",
                                        env_name: "DOWNLOAD_DSYMS_USERNAME",
                                        description: "Your Apple ID Username for App Store Connect",
                                        default_value: user,
-                                       default_value_dynamic: true),
+                                       default_value_dynamic: true,
+                                       conflicting_options: [:api_key]),
           FastlaneCore::ConfigItem.new(key: :app_identifier,
                                        short_option: "-a",
                                        env_name: "DOWNLOAD_DSYMS_APP_IDENTIFIER",
