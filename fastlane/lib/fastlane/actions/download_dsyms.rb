@@ -220,9 +220,11 @@ module Fastlane
       end
 
       def self.api_token(params)
-        @api_token ||= Spaceship::ConnectAPI::Token.create(params[:api_key]) if params[:api_key]
-        return @api_token
-      end
+         params[:api_key] ||= Actions.lane_context[SharedValues::APP_STORE_CONNECT_API_KEY]
+         api_token ||= Spaceship::ConnectAPI::Token.create(params[:api_key]) if params[:api_key]
+         api_token ||= Spaceship::ConnectAPI::Token.from_json_file(params[:api_key_path]) if params[:api_key_path]
+         return api_token
+       end
       
       #####################################################
       # @!group Documentation
@@ -255,20 +257,28 @@ module Fastlane
 
         [
           
-          FastlaneCore::ConfigItem.new(key: :api_key,
-                                       env_name: "APPSTORE_BUILD_NUMBER_API_KEY",
-                                       description: "Your App Store Connect API Key information (https://docs.fastlane.tools/app-store-connect-api/#use-return-value-and-pass-in-as-an-option)",
-                                       type: Hash,
-                                       optional: true,
-                                       sensitive: true,
-                                       conflicting_options: [:username]),
+          FastlaneCore::ConfigItem.new(key: :api_key_path,
+                                      env_name: "DOWNLOAD_DSYMS_API_KEY_PATH",
+                                      description: "Path to your App Store Connect API Key JSON file (https://docs.fastlane.tools/app-store-connect-api/#using-fastlane-api-key-json-file)",
+                                      optional: true,
+                                      conflicting_options: [:api_key],
+                                      verify_block: proc do |value|
+                                        UI.user_error!("Couldn't find API key JSON file at path '#{value}'") unless File.exist?(value)
+                                      end),
+           FastlaneCore::ConfigItem.new(key: :api_key,
+                                      env_name: "DOWNLOAD_DSYMS_API_KEY",
+                                      description: "Your App Store Connect API Key information (https://docs.fastlane.tools/app-store-connect-api/#use-return-value-and-pass-in-as-an-option)",
+                                      type: Hash,
+                                      optional: true,
+                                      sensitive: true,
+                                      conflicting_options: [:api_key_path]),
           FastlaneCore::ConfigItem.new(key: :username,
                                        short_option: "-u",
                                        env_name: "DOWNLOAD_DSYMS_USERNAME",
                                        description: "Your Apple ID Username for App Store Connect",
+                                       optional: true,
                                        default_value: user,
-                                       default_value_dynamic: true,
-                                       conflicting_options: [:api_key]),
+                                       default_value_dynamic: true),
           FastlaneCore::ConfigItem.new(key: :app_identifier,
                                        short_option: "-a",
                                        env_name: "DOWNLOAD_DSYMS_APP_IDENTIFIER",
